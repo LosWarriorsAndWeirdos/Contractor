@@ -13,10 +13,7 @@ import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -26,66 +23,76 @@ public class ContractorController {
     @Autowired
     private ContractorService contractorService;
 
-    @GetMapping(produces = MediaType.APPLICATION_JSON_VALUE)
+    @GetMapping()
     public ResponseEntity<List<Contractor>> fetchAll() {
-        try {
-            List<Contractor> contractors = contractorService.findAll();
-            return new ResponseEntity<List<Contractor>>(contractors, HttpStatus.OK);
+        List<Contractor> contractors = new ArrayList<>();
+        contractors = contractorService.findAllContractors();
+
+        if (contractors.isEmpty()){
+            return ResponseEntity.noContent().build();
         }
-        catch (Exception e) {
-            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
-        }
+
+        return ResponseEntity.ok(contractors);
     }
 
-    @GetMapping(path = "/id/{id}", produces = MediaType.APPLICATION_JSON_VALUE)
+    @GetMapping(path = "{id}")
     public ResponseEntity<Contractor> fetchById(@PathVariable("id") Long id) {
-        try {
-            Optional<Contractor> optionalContractor = contractorService.findById(id);
-            if (optionalContractor.isPresent()) {
-                return new ResponseEntity<Contractor>(optionalContractor.get(), HttpStatus.OK);
-            } else {
-                return new ResponseEntity<>(HttpStatus.NOT_FOUND);
-            }
+        log.info("Getting Contractor ID {}", id);
+        Contractor contractor = contractorService.getContractor(id);
+        if (contractor == null) {
+            log.error("This Contractor ID {} doens't found");
+            return ResponseEntity.notFound().build();
         }
-        catch (Exception e) {
-            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
-        }
+        return ResponseEntity.ok(contractor);
     }
 
     @GetMapping(path = "/contractor/{dni}", produces = MediaType.APPLICATION_JSON_VALUE)
     public ResponseEntity<Contractor> fetchByDni(@PathVariable("dni") String dni) {
-        try {
-            Optional<Contractor> optionalContractor = contractorService.findByDni(dni);
-            if (optionalContractor.isPresent()) {
-                return ResponseEntity.ok(optionalContractor.get());
-            } else {
-                return ResponseEntity.notFound().build();
-            }
+        log.info("Getting Contractor by DNI {}", dni);
+        Contractor contractor = contractorService.findByDni(dni);
+        if  (contractor == null){
+            log.error("This Contractor with DNI {} doesn't found");
+            return ResponseEntity.notFound().build();
         }
-        catch (Exception e) {
-            return new ResponseEntity<>(HttpStatus.INTERNAL_SERVER_ERROR);
-        }
+
+        return ResponseEntity.ok(contractor);
     }
 
     @PostMapping
     public ResponseEntity<Contractor> createContractor(@RequestBody Contractor contractor, BindingResult result) throws Exception {
-       if (result.hasErrors()) {
+       log.info("Creating Contractor {}", contractor);
+       if (result.hasErrors()){
            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, this.formatMessage(result));
        }
-       Contractor contractorDB = contractorService.create(contractor);
+
+       Contractor contractorDB = contractorService.createContractor(contractor);
        return ResponseEntity.status(HttpStatus.CREATED).body(contractorDB);
     }
 
     @PutMapping(value = "/{id}")
     public ResponseEntity<?> updateContractor(@PathVariable("id") long id, @RequestBody Contractor contractor) throws Exception {
-        Contractor contractorDB = contractorService.getContractor(id);
+       log.info("Updating Contractor ID {}", id);
+       Contractor currentContractor = contractorService.getContractor(id);
 
-        if (contractorDB == null) {
+       if (currentContractor == null) {
+           log.error("It can't be updated. Contractor ID {} doesn't exists", id);
+           return ResponseEntity.notFound().build();
+       }
+       contractor.setId(id);
+       currentContractor = contractorService.updateContractor(contractor);
+       return ResponseEntity.ok(currentContractor);
+    }
+
+    @DeleteMapping(value = "/{id}")
+    public ResponseEntity<Contractor> deleteContractor(@PathVariable("id") long id){
+        log.info("Deleting Contractor ID {}");
+        Contractor contractor = contractorService.getContractor(id);
+        if (contractor == null){
+            log.error("Can't be deleted Contractor ID {} because it doesn't found");
             return ResponseEntity.notFound().build();
         }
-
-        contractorDB = contractorService.update(contractor);
-        return ResponseEntity.ok(contractorDB);
+        contractor = contractorService.deleteContractor(contractor);
+        return ResponseEntity.ok(contractor);
     }
     private String formatMessage(BindingResult result)
     {
